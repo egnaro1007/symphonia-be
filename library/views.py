@@ -2,11 +2,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework.permissions import IsAuthenticated
+from django.db.models import Q
 
 from .models import Song, Artist, Album, ListeningHistory
 from .serializers import SongSerializer, SimpleSongSerializer, ArtistSerializer, AlbumSerializer, ListeningHistorySerializer
 
-class SearchView(APIView):  # Fix typo: ApiView -> APIView
+class SearchView(APIView):
     def get(self, request, *args, **kwargs):
         query = request.query_params.get('query', None)
         max_results = int(request.query_params.get('max_results', 5))  # Default to 5 results
