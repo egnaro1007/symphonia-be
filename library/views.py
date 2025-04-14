@@ -41,3 +41,5 @@ class ArtistViewSet(ReadOnlyModelViewSet):
 class AlbumViewSet(ReadOnlyModelViewSet):
     queryset = Album.objects.all()
     serializer_class = AlbumSerializer
+
+
