@@ -1,4 +1,6 @@
 from django.db import models
+
+from django.contrib.auth.models import User
     
 class Artist(models.Model):
     name = models.CharField(max_length=255)
@@ -38,3 +40,15 @@ class Playlist(models.Model):
 
     def __str__(self):
         return self.name
+    
+class ListeningHistory(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='listening_history')
+    song = models.ForeignKey(Song, on_delete=models.CASCADE, related_name='listening_history')
+    position = models.IntegerField(default=0)  
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'song')
+
+    def __str__(self):
+        return f"{self.user.username} - {self.song.title} at {self.position}s"

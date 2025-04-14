@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Song, Artist, Album, Playlist
+from .models import Song, Artist, Album, Playlist, ListeningHistory
 
 class ArtistSerializer(serializers.ModelSerializer):
     class Meta:
@@ -37,3 +37,30 @@ class SongSerializer(serializers.ModelSerializer):
         model = Song
         fields = ['id', 'title', 'artist', 'album', 'release_date', 'duration', 'cover_art', 'audio']
 
+class SimpleSongSerializer(serializers.ModelSerializer):
+    artist = serializers.SerializerMethodField()
+    cover_art = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Song
+        fields = ['id', 'title', 'artist', 'cover_art']
+
+    def get_artist(self, obj):
+        return [{'id': artist.id, 'name': artist.name} for artist in obj.artist.all()]
+    
+    def get_cover_art(self, obj):
+        return obj.cover_art if obj.cover_art else None
+
+class ListeningHistorySerializer(serializers.ModelSerializer):
+    song = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ListeningHistory
+        fields = ['id', 'song', 'position', 'updated_at']
+
+    def get_song(self, obj):
+        return {
+            'id': obj.song.id,
+            'title': obj.song.title,
+            'cover_art': obj.song.cover_art if obj.song.cover_art else None,
+        }

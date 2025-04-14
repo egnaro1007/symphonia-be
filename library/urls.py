@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .views import SongViewSet, ArtistViewSet, AlbumViewSet
-from .views import SearchView
+from .views import SearchView, UpdateListeningHistoryView, ListeningHistoryView
 
 router = DefaultRouter()
 router.register(r'songs', SongViewSet, basename='song')
@@ -11,4 +11,6 @@ router.register(r'albums', AlbumViewSet, basename='album')
 
 urlpatterns = router.urls + [
     path('search/', SearchView.as_view(), name='search'),
+    path('update-position/', UpdateListeningHistoryView.as_view(), name='update_position'),
+    path('history/', ListeningHistoryView.as_view(), name='listening_history'),
 ]
