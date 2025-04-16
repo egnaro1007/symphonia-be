@@ -50,6 +50,14 @@ class SimpleSongSerializer(serializers.ModelSerializer):
     
     def get_cover_art(self, obj):
         return obj.cover_art if obj.cover_art else None
+    
+class PlaylistSerializer(serializers.ModelSerializer):
+    songs = serializers.PrimaryKeyRelatedField(queryset=Song.objects.all(), many=True)
+
+    class Meta:
+        model = Playlist
+        fields = ['id', 'owner', 'name', 'description', 'songs', 'created_at', 'updated_at', 'share_permission']
+        read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
 
 class ListeningHistorySerializer(serializers.ModelSerializer):
     song = serializers.SerializerMethodField()
