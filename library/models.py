@@ -49,62 +49,6 @@ class SharingPermission(models.TextChoices):
     FRIENDS = 'friends', 'Friends'
     PRIVATE = 'private', 'Private'
 
-class Friendship(models.Model):
-    class FriendshipStatus(models.TextChoices):
-        PENDING = 'pending', 'Pending'
-        ACCEPTED = 'accepted', 'Accepted'
-
-    user1 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friendship_user1')
-    user2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friendship_user2')
-    status = models.CharField(
-        max_length=10,
-        choices=FriendshipStatus.choices,
-        default=FriendshipStatus.PENDING,
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ('user1', 'user2')
-
-    def __str__(self):
-        return f"{self.user1.username} - {self.user2.username} - ({self.status})"
-    
-    def save(self, *args, **kwargs):
-        if self.user1 == self.user2:
-            raise ValueError("Users cannot be friends with themselves.")
-        if self.user1.id > self.user2.id:
-            self.user1, self.user2 = self.user2, self.user1
-
-        existing_friendship = Friendship.objects.filter(
-            user1=self.user1,
-            user2=self.user2,
-        ).first()
-
-        if existing_friendship is None:
-            super().save(*args, **kwargs)
-
-        if existing_friendship:
-            if existing_friendship.status == Friendship.FriendshipStatus.ACCEPTED:
-                return
-            elif existing_friendship.status == Friendship.FriendshipStatus.PENDING:
-                existing_friendship.status = Friendship.FriendshipStatus.ACCEPTED
-                existing_friendship.save()
-                self.status = Friendship.FriendshipStatus.ACCEPTED
-                return
-            
-    @classmethod
-    def remove_friendship(cls, user1, user2):
-        if user1 == user2:
-            raise ValueError("Users cannot be friends with themselves.")
-        friendship = Friendship.objects.filter(
-            models.Q(user1=user1, user2=user2) | models.Q(user1=user2, user2=user1)
-        ).first()
-        if friendship:
-            friendship.delete()
-            return True
-        return False
-
 
 class Playlist(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='playlists')
@@ -129,5 +73,5 @@ class Playlist(models.Model):
         if self.share_permission == SharingPermission.PUBLIC:
             return True
         elif self.share_permission == SharingPermission.FRIENDS:
-            return self.owner.get_friend_status(user) == Friendship.FriendshipStatus.ACCEPTED
+            return self.owner.is_friend_with(user)
         return False
