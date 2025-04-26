@@ -19,7 +19,7 @@ class AlbumSerializer(serializers.ModelSerializer):
             {
                 'id': song.id,
                 'title': song.title,
-                'cover_art': song.cover_art if song.cover_art else None
+                'cover_art': song.cover_art.url if song.cover_art else None
             }
             for song in obj.songs.all()
         ]
