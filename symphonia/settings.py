@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'rest_framework',
 
     'library.apps.LibraryConfig',
+    "drf_spectacular"
 ]
 
 MIDDLEWARE = [
@@ -129,8 +130,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
-
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Symphonia API',
+    'DESCRIPTION': 'API for Symphonia',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
