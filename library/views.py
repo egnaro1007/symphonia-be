@@ -69,6 +69,26 @@ class PlaylistViewSet(ModelViewSet):
         playlist_data['songs'] = serialized_songs
 
         return Response(playlist_data)
+    
+class AddSongToPlaylistView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        playlist_id = request.data.get('playlist_id')
+        song_id = request.data.get('song_id')
+
+        if not playlist_id or not song_id:
+            return Response({"error": "playlist_id and song_id fields are required"}, status=400)
+
+        try:
+            playlist = Playlist.objects.get(id=playlist_id, owner=request.user)
+            song = Song.objects.get(id=song_id)
+            playlist.songs.add(song)
+            return Response({"message": "Song added to playlist"}, status=200)
+        except Playlist.DoesNotExist:
+            return Response({"error": "Playlist not found"}, status=404)
+        except Song.DoesNotExist:
+            return Response({"error": "Song not found"}, status=404)
 
 class UpdateListeningHistoryView(APIView):
     permission_classes = [IsAuthenticated]
