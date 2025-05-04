@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet, ModelViewSet
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
+from django.contrib.auth.models import User
 
 from .models import Song, Artist, Album, ListeningHistory, Playlist
 from .serializers import SongSerializer, SimpleSongSerializer, ArtistSerializer, AlbumSerializer, PlaylistSerializer, ListeningHistorySerializer
@@ -49,7 +50,16 @@ class PlaylistViewSet(ModelViewSet):
         
     def list(self, request, *args, **kwargs):
         user = request.user if request.user.is_authenticated else None
-        serializer = self.get_serializer(self.get_queryset().filter(owner=user), many=True)
+        query_user_id = request.data.get('user_id', None)
+        
+        if query_user_id:
+            try:
+                query_user = User.objects.get(id=query_user_id)
+                serializer = self.get_serializer(self.get_queryset().filter(owner=query_user), many=True)
+            except User.DoesNotExist:
+                return Response({"error": "User not found"}, status=404)
+        else:
+            serializer = self.get_serializer(self.get_queryset().filter(owner=user), many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, *args, **kwargs):
