@@ -13,7 +13,17 @@ class RegisterUserAPIView(APIView):
             serializer.save()
             return Response({"message": "User register successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+class SearchUserAPIView(APIView):
+    def get(self, request):
+        query = request.query_params.get('query', '')
+        if not query:
+            return Response({"error": "query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        users = User.objects.filter(username__icontains=query)[:10]
+        user_data = [{"id": user.id, "username": user.username} for user in users]
+        
+        return Response(user_data, status=status.HTTP_200_OK)    
 
 class GetUserIDFromUsernameAPIView(APIView):
     def post(self, request):
@@ -61,7 +71,13 @@ class FriendRequestAPIView(APIView):
         if not user.is_authenticated:
             return Response({"error": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
         
-
+        friends = [
+            {
+                "id": friend.id,
+                "username": friend.username
+            }
+            for friend in user.get_friends()
+        ]
         sent_requests_data = [
             {
                 "id": request.id,  
@@ -80,6 +96,7 @@ class FriendRequestAPIView(APIView):
         ]
         
         return Response({
+            "friends": friends,
             "sent_requests": sent_requests_data,
             "received_requests": received_requests_data
         }, status=status.HTTP_200_OK)
