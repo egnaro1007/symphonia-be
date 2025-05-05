@@ -108,9 +108,14 @@ class ResponseFriendRequestAPIView(APIView):
             return Response({"error": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
 
         id = request.data.get('id')
-        if not id:
-            return Response({"error": "id field is required"}, status=status.HTTP_400_BAD_REQUEST)
-        friend_request = FriendRequest.objects.filter(id=id).first()
+        sender_user_id = request.data.get('user_id')
+        if not id and not sender_user_id:
+            return Response({"error": "id or user_id fields are required"}, status=status.HTTP_400_BAD_REQUEST)
+        if id:
+            friend_request = FriendRequest.objects.filter(id=id).first()
+        elif sender_user_id:
+            friend_request = FriendRequest.objects.filter(sender_id=sender_user_id, receiver_id=user.id).first()
+        
         if not friend_request:
             return Response({"error": "Friend request not found"}, status=status.HTTP_404_NOT_FOUND)
         if friend_request.receiver != user:
@@ -121,10 +126,10 @@ class ResponseFriendRequestAPIView(APIView):
             return Response({"error": "response field must be 'accept' or 'reject'"}, status=status.HTTP_400_BAD_REQUEST)
         
         if response == 'accept':
-            FriendRequest.objects.get(id=id).accept()
+            friend_request.accept()
             return Response({"message": "Friend request accepted"}, status=status.HTTP_200_OK)
         elif response == 'reject':
-            FriendRequest.objects.get(id=id).reject()
+            friend_request.reject()
             return Response({"message": "Friend request rejected"}, status=status.HTTP_200_OK)
         
         return Response(status=status.HTTP_400_BAD_REQUEST)
