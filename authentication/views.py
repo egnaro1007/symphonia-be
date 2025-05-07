@@ -18,7 +18,7 @@ class SearchUserAPIView(APIView):
     def get(self, request):
         user = request.user
         query = request.query_params.get('query', '')
-        max_results = request.query_params.get('max_results', 10)
+        max_results = int(request.query_params.get('max_results', 10))
         if not query:
             return Response({"error": "query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -26,13 +26,14 @@ class SearchUserAPIView(APIView):
         
         if user.is_authenticated:
             results = results.exclude(id=user.id)
-            results = results[::int(max_results)]
+            results = results[:max_results]  # Limit to max_results
             user_data = [{
                 "id": result.id, 
                 "username": result.username, 
                 "relationships_status": user.get_friend_status(result)
             } for result in results]
         else:
+            results = results[:max_results]  # Also limit results for unauthenticated users
             user_data = [{
                 "id": result.id, 
                 "username": result.username,
