@@ -81,7 +81,7 @@ class FriendRequestAPIView(APIView):
         friend_id = request.data.get('id')
         friend_username = request.data.get('username')
         if not friend_id and not friend_username:
-            return Response({"error": "friend_id or friend_username field is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "id or username field is required"}, status=status.HTTP_400_BAD_REQUEST)
         
         if friend_id:
             try:
@@ -168,3 +168,31 @@ class ResponseFriendRequestAPIView(APIView):
             return Response({"message": "Friend request rejected"}, status=status.HTTP_200_OK)
         
         return Response(status=status.HTTP_400_BAD_REQUEST)
+    
+class UnfriendAPIView(APIView):
+    def post(self, request):
+        user = request.user
+        if not user.is_authenticated:
+            return Response({"error": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        friend_id = request.data.get('id')
+        friend_username = request.data.get('username')
+        if not friend_id and not friend_username:
+            return Response({"error": "id or username field is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            if friend_id:
+                friend = User.objects.get(id=friend_id)
+            elif friend_username:
+                friend = User.objects.get(username=friend_username)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not user.is_friend_with(friend):
+            return Response({"error": "You are not friends with this user"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        done = Friendship.remove_friendship(user, friend)
+        if done: 
+            return Response({"message": "Unfriended successfully"}, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "Failed to unfriend"}, status=status.HTTP_400_BAD_REQUEST)
