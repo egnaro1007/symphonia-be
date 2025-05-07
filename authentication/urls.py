@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
-from authentication.views import RegisterUserAPIView, SearchUserAPIView, GetUserIDFromUsernameAPIView, FriendRequestAPIView, ResponseFriendRequestAPIView
+from authentication.views import RegisterUserAPIView, SearchUserAPIView, GetUserInfoAPIView, GetUserIDFromUsernameAPIView, FriendRequestAPIView, ResponseFriendRequestAPIView
 
 
 urlpatterns = [
@@ -14,5 +14,7 @@ urlpatterns = [
     path('get_user_id/', GetUserIDFromUsernameAPIView.as_view(), name='get_user_id_from_username'),
     path('friend_request/', FriendRequestAPIView.as_view(), name='friend_request'),
     path('response_friend_request/', ResponseFriendRequestAPIView.as_view(), name='response_friend_request'),
-    path('search_user/', SearchUserAPIView.as_view(), name='search_user')
+    path('search_user/', SearchUserAPIView.as_view(), name='search_user'),
+    path('get_user_info/', GetUserInfoAPIView.as_view(), name='get_user_info'),
+    path('get_user_info/<int:requested_user_id>/', GetUserInfoAPIView.as_view(), name='get_user_info'),
 ]

@@ -23,6 +23,38 @@ class SearchUserAPIView(APIView):
         users = User.objects.filter(username__icontains=query)[:10]
         user_data = [{"id": user.id, "username": user.username} for user in users]
         
+        return Response(user_data, status=status.HTTP_200_OK)
+
+class GetUserInfoAPIView(APIView):
+    def get(self, request, requested_user_id=None):
+        user = request.user
+
+        if not user.is_authenticated:
+            return Response({"error": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
+        
+
+        if not requested_user_id:
+            user_data = {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name
+            }
+        else:
+            try:
+                requested_user = User.objects.get(id=requested_user_id)
+            except User.DoesNotExist:
+                return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            user_data = {
+                "id": requested_user.id,
+                "username": requested_user.username,
+                "email": requested_user.email,
+                "first_name": requested_user.first_name,
+                "last_name": requested_user.last_name
+            }
+        
         return Response(user_data, status=status.HTTP_200_OK)    
 
 class GetUserIDFromUsernameAPIView(APIView):
