@@ -16,12 +16,28 @@ class RegisterUserAPIView(APIView):
 
 class SearchUserAPIView(APIView):
     def get(self, request):
+        user = request.user
         query = request.query_params.get('query', '')
+        max_results = request.query_params.get('max_results', 10)
         if not query:
             return Response({"error": "query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
         
-        users = User.objects.filter(username__icontains=query)[:10]
-        user_data = [{"id": user.id, "username": user.username} for user in users]
+        results = User.objects.filter(username__icontains=query)
+        
+        if user.is_authenticated:
+            results = results.exclude(id=user.id)
+            results = results[::int(max_results)]
+            user_data = [{
+                "id": result.id, 
+                "username": result.username, 
+                "relationships_status": user.get_friend_status(result)
+            } for result in results]
+        else:
+            user_data = [{
+                "id": result.id, 
+                "username": result.username,
+                "relationships_status": "none"
+            } for result in results]
         
         return Response(user_data, status=status.HTTP_200_OK)
 
