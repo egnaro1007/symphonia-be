@@ -31,6 +31,15 @@ User.add_to_class(
     )
 )
 User.add_to_class(
+    'get_friend_status',
+    lambda self, user: (
+        "friend" if Friendship.objects.filter(Q(user1=self, user2=user) | Q(user1=user, user2=self)).exists()
+        else "pending_sent" if FriendRequest.objects.filter(sender=self, receiver=user).exists()
+        else "pending_received" if FriendRequest.objects.filter(sender=user, receiver=self).exists()
+        else "none"
+    )
+)
+User.add_to_class(
     'is_friend_with',
     lambda self, user: (
         Friendship.objects.filter(Q(user1=self, user2=user) | Q(user1=user, user2=self)).exists()

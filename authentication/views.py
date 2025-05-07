@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from .models import FriendRequest
+from .models import Friendship, FriendRequest
 from .serializers import RegisterUserSerializer
 
 class RegisterUserAPIView(APIView):
@@ -39,11 +39,13 @@ class GetUserInfoAPIView(APIView):
                 "username": user.username,
                 "email": user.email,
                 "first_name": user.first_name,
-                "last_name": user.last_name
+                "last_name": user.last_name,
+                "relationships_status": "none"
             }
         else:
             try:
                 requested_user = User.objects.get(id=requested_user_id)
+
             except User.DoesNotExist:
                 return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -52,7 +54,8 @@ class GetUserInfoAPIView(APIView):
                 "username": requested_user.username,
                 "email": requested_user.email,
                 "first_name": requested_user.first_name,
-                "last_name": requested_user.last_name
+                "last_name": requested_user.last_name,
+                "relationships_status": user.get_friend_status(requested_user)
             }
         
         return Response(user_data, status=status.HTTP_200_OK)    
