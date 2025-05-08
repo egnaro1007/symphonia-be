@@ -49,7 +49,7 @@ class SimpleSongSerializer(serializers.ModelSerializer):
         return [{'id': artist.id, 'name': artist.name} for artist in obj.artist.all()]
     
     def get_cover_art(self, obj):
-        return obj.cover_art if obj.cover_art else None
+        return obj.cover_art.url if obj.cover_art else None
     
 class PlaylistSerializer(serializers.ModelSerializer):
     songs = serializers.PrimaryKeyRelatedField(queryset=Song.objects.all(), many=True)
@@ -70,5 +70,5 @@ class ListeningHistorySerializer(serializers.ModelSerializer):
         return {
             'id': obj.song.id,
             'title': obj.song.title,
-            'cover_art': obj.song.cover_art if obj.song.cover_art else None,
+            'cover_art': obj.song.cover_art.url if obj.song.cover_art else None,
         }
