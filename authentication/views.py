@@ -14,6 +14,14 @@ class RegisterUserAPIView(APIView):
             return Response({"message": "User register successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def delete(self, request):
+        user = request.user
+        if not user.is_authenticated:
+            return Response({"error": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        user.delete()
+        return Response({"message": "Your account has been deleted successfully."}, status=status.HTTP_200_OK)
+
 class SearchUserAPIView(APIView):
     def get(self, request):
         user = request.user
