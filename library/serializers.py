@@ -43,7 +43,7 @@ class SimpleSongSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Song
-        fields = ['id', 'title', 'artist', 'cover_art']
+        fields = ['id', 'title', 'artist', 'cover_art', 'audio']
 
     def get_artist(self, obj):
         return [{'id': artist.id, 'name': artist.name} for artist in obj.artist.all()]
