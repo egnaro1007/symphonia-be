@@ -143,3 +143,44 @@ class ListeningHistoryView(APIView):
         histories = ListeningHistory.objects.filter(user=request.user).order_by('-updated_at')
         serializer = ListeningHistorySerializer(histories, many=True)
         return Response(serializer.data, status=200) 
+    
+class LikedSongsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, song_id=None):
+        if not song_id:
+            liked_songs = Song.objects.filter(liked_by=request.user)
+            return Response(SimpleSongSerializer(liked_songs, many=True).data, status=200)
+        else:
+            try:
+                song = Song.objects.get(id=song_id)
+                liked_status = request.user in song.liked_by.all()
+                return Response({"liked": liked_status}, status=200)
+            except Song.DoesNotExist:
+                return Response({"error": "Song not found"}, status=404)
+
+    def post(self, request, song_id):
+        if not song_id:
+            return Response({"error": "song_id field is required"}, status=400)
+        
+        try:
+            song = Song.objects.get(id=song_id)
+            song.liked_by.add(request.user)
+            return Response({"message": "Song liked"}, status=200)
+        except Song.DoesNotExist:
+            return Response({"error": "Song not found"}, status=404)
+
+    def delete(self, request, song_id):
+        if not song_id:
+            return Response({"error": "song_id field is required"}, status=400)
+        
+        try:
+            song = Song.objects.get(id=song_id)
+            if request.user in song.liked_by.all():
+                song.liked_by.remove(request.user)
+                return Response({"message": "Song disliked"}, status=200)
+            else:
+                return Response({"error": "Song not liked"}, status=200)
+
+        except Song.DoesNotExist:
+            return Response({"error": "Song not found"}, status=404)

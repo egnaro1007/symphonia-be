@@ -27,6 +27,7 @@ class Song(models.Model):
     duration = models.DurationField(blank=True, null=True)
     cover_art = models.ImageField(upload_to='images/cover_art/', blank=True, null=True)
     audio = models.FileField(upload_to='songs/')
+    liked_by = models.ManyToManyField(User, related_name='liked_songs', blank=True)
 
     def __str__(self):
         return f"{self.title} by {', '.join([artist.name for artist in self.artist.all()])}"
