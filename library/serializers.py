@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Song, Artist, Album, Playlist, ListeningHistory
+from datetime import timedelta
 
 class ArtistSerializer(serializers.ModelSerializer):
     class Meta:
@@ -40,16 +41,22 @@ class SongSerializer(serializers.ModelSerializer):
 class SimpleSongSerializer(serializers.ModelSerializer):
     artist = serializers.SerializerMethodField()
     cover_art = serializers.SerializerMethodField()
+    duration_seconds = serializers.SerializerMethodField()
 
     class Meta:
         model = Song
-        fields = ['id', 'title', 'artist', 'cover_art', 'audio', 'lyric']
+        fields = ['id', 'title', 'artist', 'cover_art', 'audio', 'lyric', 'duration_seconds']
 
     def get_artist(self, obj):
         return [{'id': artist.id, 'name': artist.name} for artist in obj.artist.all()]
     
     def get_cover_art(self, obj):
         return obj.cover_art.url if obj.cover_art else None
+    
+    def get_duration_seconds(self, obj):
+        if obj.duration:
+            return int(obj.duration.total_seconds())
+        return 0
     
 class PlaylistSerializer(serializers.ModelSerializer):
     songs = serializers.PrimaryKeyRelatedField(queryset=Song.objects.all(), many=True)
@@ -58,6 +65,30 @@ class PlaylistSerializer(serializers.ModelSerializer):
         model = Playlist
         fields = ['id', 'owner', 'name', 'description', 'songs', 'created_at', 'updated_at', 'share_permission']
         read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
+
+class PlaylistDetailSerializer(serializers.ModelSerializer):
+    songs = SimpleSongSerializer(many=True, read_only=True)
+    owner_name = serializers.SerializerMethodField()
+    total_duration_seconds = serializers.SerializerMethodField()
+    songs_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Playlist
+        fields = ['id', 'owner', 'owner_name', 'name', 'description', 'songs', 'created_at', 'updated_at', 'share_permission', 'total_duration_seconds', 'songs_count']
+        read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
+
+    def get_owner_name(self, obj):
+        return obj.owner.username if obj.owner else 'Unknown'
+    
+    def get_total_duration_seconds(self, obj):
+        total_seconds = 0
+        for song in obj.songs.all():
+            if song.duration:
+                total_seconds += int(song.duration.total_seconds())
+        return total_seconds
+    
+    def get_songs_count(self, obj):
+        return obj.songs.count()
 
 class ListeningHistorySerializer(serializers.ModelSerializer):
     song = serializers.SerializerMethodField()

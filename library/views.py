@@ -4,9 +4,12 @@ from rest_framework.viewsets import ReadOnlyModelViewSet, ModelViewSet
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
 from django.contrib.auth.models import User
+import json
+from rest_framework import status
+from rest_framework.decorators import api_view
 
 from .models import Song, Artist, Album, ListeningHistory, Playlist
-from .serializers import SongSerializer, SimpleSongSerializer, ArtistSerializer, AlbumSerializer, PlaylistSerializer, ListeningHistorySerializer
+from .serializers import SongSerializer, SimpleSongSerializer, ArtistSerializer, AlbumSerializer, PlaylistSerializer, PlaylistDetailSerializer, ListeningHistorySerializer
 from .permissions import CanAcessPermission
 
 class SearchView(APIView):
@@ -48,31 +51,32 @@ class PlaylistViewSet(ModelViewSet):
     serializer_class = PlaylistSerializer
     permission_classes = [CanAcessPermission]
 
+    def get_serializer_class(self):
+        if self.action in ['list', 'retrieve']:
+            return PlaylistDetailSerializer
+        return PlaylistSerializer
+
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
-        
+
     def list(self, request, *args, **kwargs):
-        user = request.user if request.user.is_authenticated else None
-        query_user_id = request.data.get('user_id', None)
+        # Get playlists owned by the current user
+        queryset = self.get_queryset().filter(owner=request.user)
         
-        if query_user_id:
-            try:
-                query_user = User.objects.get(id=query_user_id)
-                serializer = self.get_serializer(self.get_queryset().filter(owner=query_user), many=True)
-            except User.DoesNotExist:
-                return Response({"error": "User not found"}, status=404)
-        else:
-            serializer = self.get_serializer(self.get_queryset().filter(owner=user), many=True)
+        # Apply any additional filters here if needed
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, *args, **kwargs):
-        playlist_data = super().retrieve(request, *args, **kwargs).data
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
-        serialized_songs = SimpleSongSerializer(self.get_object().songs.all(), many=True).data
-        playlist_data['songs'] = serialized_songs
-
-        return Response(playlist_data)
-    
 class AddSongToPlaylistView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -184,3 +188,121 @@ class LikedSongsView(APIView):
 
         except Song.DoesNotExist:
             return Response({"error": "Song not found"}, status=404)
+
+class UploadLyricsView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, song_id):
+        """
+        Upload lyrics from JSON file for a specific song
+        Expected JSON format:
+        [
+            {
+                "startTime": 0,
+                "text": "Lyrics line text",
+                "duration": 5.59
+            },
+            ...
+        ]
+        """
+        try:
+            song = Song.objects.get(id=song_id)
+        except Song.DoesNotExist:
+            return Response({"error": "Song not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if file is provided
+        if 'lyrics_file' not in request.FILES:
+            return Response(
+                {"error": "No lyrics file provided. Please upload a JSON file."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        lyrics_file = request.FILES['lyrics_file']
+        
+        # Validate file extension
+        if not lyrics_file.name.endswith('.json'):
+            return Response(
+                {"error": "Invalid file format. Please upload a JSON file."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Read and parse JSON file
+            file_content = lyrics_file.read().decode('utf-8')
+            lyrics_data = json.loads(file_content)
+            
+            # Validate JSON structure
+            if not isinstance(lyrics_data, list):
+                return Response(
+                    {"error": "Invalid JSON format. Expected an array of lyrics objects."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate each lyrics entry
+            for i, entry in enumerate(lyrics_data):
+                if not isinstance(entry, dict):
+                    return Response(
+                        {"error": f"Invalid entry at index {i}. Each entry must be an object."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                required_fields = ['startTime', 'text', 'duration']
+                for field in required_fields:
+                    if field not in entry:
+                        return Response(
+                            {"error": f"Missing required field '{field}' in entry at index {i}."}, 
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                
+                # Validate data types
+                try:
+                    float(entry['startTime'])
+                    float(entry['duration'])
+                    str(entry['text'])
+                except (ValueError, TypeError):
+                    return Response(
+                        {"error": f"Invalid data types in entry at index {i}. startTime and duration must be numbers."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Save lyrics to song
+            song.lyric = lyrics_data
+            song.save()
+            
+            return Response(
+                {
+                    "message": "Lyrics uploaded successfully",
+                    "song_id": song.id,
+                    "song_title": song.title,
+                    "lyrics_count": len(lyrics_data)
+                }, 
+                status=status.HTTP_200_OK
+            )
+            
+        except json.JSONDecodeError as e:
+            return Response(
+                {"error": f"Invalid JSON format: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"An error occurred while processing the file: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def delete(self, request, song_id):
+        """
+        Remove lyrics from a specific song
+        """
+        try:
+            song = Song.objects.get(id=song_id)
+        except Song.DoesNotExist:
+            return Response({"error": "Song not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        song.lyric = None
+        song.save()
+        
+        return Response(
+            {"message": "Lyrics removed successfully"}, 
+            status=status.HTTP_200_OK
+        )
