@@ -59,11 +59,11 @@ class SimpleSongSerializer(serializers.ModelSerializer):
         return 0
     
 class PlaylistSerializer(serializers.ModelSerializer):
-    songs = serializers.PrimaryKeyRelatedField(queryset=Song.objects.all(), many=True)
+    songs = serializers.PrimaryKeyRelatedField(queryset=Song.objects.all(), many=True, required=False)
 
     class Meta:
         model = Playlist
-        fields = ['id', 'owner', 'name', 'description', 'songs', 'created_at', 'updated_at', 'share_permission']
+        fields = ['id', 'owner', 'name', 'description', 'songs', 'cover_image', 'created_at', 'updated_at', 'share_permission']
         read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
 
 class PlaylistDetailSerializer(serializers.ModelSerializer):
@@ -71,10 +71,11 @@ class PlaylistDetailSerializer(serializers.ModelSerializer):
     owner_name = serializers.SerializerMethodField()
     total_duration_seconds = serializers.SerializerMethodField()
     songs_count = serializers.SerializerMethodField()
+    cover_image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Playlist
-        fields = ['id', 'owner', 'owner_name', 'name', 'description', 'songs', 'created_at', 'updated_at', 'share_permission', 'total_duration_seconds', 'songs_count']
+        fields = ['id', 'owner', 'owner_name', 'name', 'description', 'songs', 'cover_image', 'cover_image_url', 'created_at', 'updated_at', 'share_permission', 'total_duration_seconds', 'songs_count']
         read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
 
     def get_owner_name(self, obj):
@@ -89,6 +90,9 @@ class PlaylistDetailSerializer(serializers.ModelSerializer):
     
     def get_songs_count(self, obj):
         return obj.songs.count()
+    
+    def get_cover_image_url(self, obj):
+        return obj.cover_image.url if obj.cover_image else None
 
 class ListeningHistorySerializer(serializers.ModelSerializer):
     song = serializers.SerializerMethodField()

@@ -52,11 +52,24 @@ class SharingPermission(models.TextChoices):
     PRIVATE = 'private', 'Private'
 
 
+def playlist_cover_upload_path(instance, filename):
+    """
+    Custom upload path for playlist cover images.
+    Files will be saved as: images/playlist_covers/{playlist_id}.{extension}
+    """
+    import os
+    # Get file extension from original filename
+    file_extension = os.path.splitext(filename)[1]
+    # Use playlist ID as filename
+    new_filename = f"{instance.id}{file_extension}"
+    return f"images/playlist_covers/{new_filename}"
+
 class Playlist(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='playlists')
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     songs = models.ManyToManyField(Song, related_name='playlists')
+    cover_image = models.ImageField(upload_to=playlist_cover_upload_path, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     share_permission = models.CharField(

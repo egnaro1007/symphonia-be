@@ -6,7 +6,8 @@ from django.db.models import Q
 from django.contrib.auth.models import User
 import json
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, action
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from .models import Song, Artist, Album, ListeningHistory, Playlist
 from .serializers import SongSerializer, SimpleSongSerializer, ArtistSerializer, AlbumSerializer, PlaylistSerializer, PlaylistDetailSerializer, ListeningHistorySerializer
@@ -50,6 +51,7 @@ class PlaylistViewSet(ModelViewSet):
     queryset = Playlist.objects.all()
     serializer_class = PlaylistSerializer
     permission_classes = [CanAcessPermission]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_serializer_class(self):
         if self.action in ['list', 'retrieve']:
@@ -77,6 +79,158 @@ class PlaylistViewSet(ModelViewSet):
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def upload_cover(self, request, pk=None):
+        """
+        Upload cover image for a playlist
+        """
+        try:
+            print(f"=== UPLOAD COVER DEBUG ===")
+            print(f"User: {request.user.username}")
+            print(f"Playlist ID: {pk}")
+            print(f"Request FILES: {list(request.FILES.keys())}")
+            print(f"Request DATA: {dict(request.data)}")
+            
+            playlist = self.get_object()
+            print(f"Playlist found: {playlist.name} (owner: {playlist.owner.username})")
+            
+            # Check if user owns the playlist
+            if playlist.owner != request.user:
+                print(f"Permission denied: {request.user.username} != {playlist.owner.username}")
+                return Response(
+                    {"error": "You don't have permission to modify this playlist"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Check if file is provided
+            if 'cover_image' not in request.FILES:
+                print(f"No cover_image in request.FILES. Available keys: {list(request.FILES.keys())}")
+                return Response(
+                    {"error": "No cover image file provided"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            cover_image = request.FILES['cover_image']
+            print(f"Cover image file: {cover_image.name}, size: {cover_image.size}, content_type: {cover_image.content_type}")
+            
+            # Validate file type by extension (more reliable than content_type for mobile uploads)
+            import os
+            file_extension = os.path.splitext(cover_image.name)[1].lower()
+            allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif']
+            allowed_content_types = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'application/octet-stream']
+            
+            print(f"File extension: {file_extension}")
+            
+            if file_extension not in allowed_extensions:
+                print(f"Invalid file extension: {file_extension}. Allowed: {allowed_extensions}")
+                return Response(
+                    {"error": f"Invalid file format. Please upload an image file with extension: {', '.join(allowed_extensions)}"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Also check content type but be more lenient (mobile apps often send application/octet-stream)
+            if hasattr(cover_image, 'content_type') and cover_image.content_type not in allowed_content_types:
+                print(f"Invalid content type: {cover_image.content_type}. Allowed: {allowed_content_types}")
+                return Response(
+                    {"error": "Invalid file format. Please upload an image file (JPEG, PNG, GIF)"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Delete old cover image if it exists
+            old_cover_path = None
+            if playlist.cover_image:
+                old_cover_path = playlist.cover_image.path
+                old_cover_name = playlist.cover_image.name
+                print(f"Found old cover image: {old_cover_name}")
+                print(f"Old cover path: {old_cover_path}")
+                
+                # Delete the old file from filesystem
+                try:
+                    playlist.cover_image.delete(save=False)  # Don't save the model yet
+                    print(f"Successfully deleted old cover image")
+                except Exception as e:
+                    print(f"Warning: Could not delete old cover image: {str(e)}")
+            else:
+                print("No existing cover image to delete")
+            
+            # Save the new cover image
+            playlist.cover_image = cover_image
+            playlist.save()
+            
+            print(f"New cover image saved: {playlist.cover_image.name}")
+            print(f"Cover image URL: {playlist.cover_image.url}")
+            print(f"Cover image path: {playlist.cover_image.path}")
+            
+            serializer = PlaylistDetailSerializer(playlist)
+            print(f"=== UPLOAD COVER SUCCESS ===")
+            return Response(
+                {
+                    "message": "Cover image uploaded successfully",
+                    "playlist": serializer.data
+                }, 
+                status=status.HTTP_200_OK
+            )
+            
+        except Exception as e:
+            print(f"=== UPLOAD COVER ERROR ===")
+            print(f"Error: {str(e)}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            return Response(
+                {"error": f"An error occurred while uploading cover image: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['delete'], permission_classes=[IsAuthenticated])
+    def remove_cover(self, request, pk=None):
+        """
+        Remove cover image from a playlist
+        """
+        try:
+            playlist = self.get_object()
+            
+            # Check if user owns the playlist
+            if playlist.owner != request.user:
+                return Response(
+                    {"error": "You don't have permission to modify this playlist"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            if playlist.cover_image:
+                old_cover_name = playlist.cover_image.name
+                old_cover_path = playlist.cover_image.path
+                print(f"Removing cover image: {old_cover_name}")
+                print(f"Cover image path: {old_cover_path}")
+                
+                try:
+                    # Delete the file from filesystem and clear the field
+                    playlist.cover_image.delete(save=False)
+                    playlist.cover_image = None
+                    playlist.save()
+                    print(f"Successfully removed cover image")
+                    
+                    return Response(
+                        {"message": "Cover image removed successfully"}, 
+                        status=status.HTTP_200_OK
+                    )
+                except Exception as e:
+                    print(f"Error removing cover image: {str(e)}")
+                    return Response(
+                        {"error": f"Failed to remove cover image: {str(e)}"}, 
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+            else:
+                return Response(
+                    {"message": "No cover image to remove"}, 
+                    status=status.HTTP_200_OK
+                )
+                
+        except Exception as e:
+            return Response(
+                {"error": f"An error occurred while removing cover image: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 class AddSongToPlaylistView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -90,7 +244,26 @@ class AddSongToPlaylistView(APIView):
         try:
             playlist = Playlist.objects.get(id=playlist_id, owner=request.user)
             song = Song.objects.get(id=song_id)
+            
+            # Check if this is the first song being added to the playlist
+            is_first_song = playlist.songs.count() == 0
+            
+            # Add song to playlist
             playlist.songs.add(song)
+            
+            # If this is the first song and playlist doesn't have a cover image,
+            # automatically set the song's cover art as playlist cover
+            if is_first_song and not playlist.cover_image and song.cover_art:
+                try:
+                    # Copy the song's cover art to playlist cover
+                    # Note: This creates a reference to the same file, not a duplicate
+                    playlist.cover_image = song.cover_art
+                    playlist.save()
+                    print(f"Auto-set playlist cover from first song: {song.title}")
+                except Exception as e:
+                    print(f"Failed to auto-set playlist cover: {str(e)}")
+                    # Don't fail the entire operation if cover setting fails
+            
             return Response({"message": "Song added to playlist"}, status=200)
         except Playlist.DoesNotExist:
             return Response({"error": "Playlist not found"}, status=404)
