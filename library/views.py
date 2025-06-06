@@ -62,8 +62,8 @@ class PlaylistViewSet(ModelViewSet):
         serializer.save(owner=self.request.user)
 
     def list(self, request, *args, **kwargs):
-        # Get playlists owned by the current user
-        queryset = self.get_queryset().filter(owner=request.user)
+        # Get playlists owned by the current user, ordered by creation date (newest first)
+        queryset = self.get_queryset().filter(owner=request.user).order_by('-created_at')
         
         # Apply any additional filters here if needed
         page = self.paginate_queryset(queryset)
@@ -252,19 +252,54 @@ class AddSongToPlaylistView(APIView):
             playlist.songs.add(song)
             
             # If this is the first song and playlist doesn't have a cover image,
-            # automatically set the song's cover art as playlist cover
+            # automatically copy the song's cover art as playlist cover
             if is_first_song and not playlist.cover_image and song.cover_art:
                 try:
-                    # Copy the song's cover art to playlist cover
-                    # Note: This creates a reference to the same file, not a duplicate
-                    playlist.cover_image = song.cover_art
+                    import os
+                    import shutil
+                    from django.core.files import File
+                    from django.conf import settings
+                    
+                    print(f"Auto-copying cover from first song: {song.title}")
+                    print(f"Song cover art path: {song.cover_art.path}")
+                    
+                    # Get file extension from song cover art
+                    original_path = song.cover_art.path
+                    file_extension = os.path.splitext(original_path)[1]
+                    
+                    # Create new filename with playlist ID
+                    new_filename = f"{playlist.id}{file_extension}"
+                    playlist_covers_dir = os.path.join(settings.MEDIA_ROOT, 'images', 'playlist_covers')
+                    new_file_path = os.path.join(playlist_covers_dir, new_filename)
+                    
+                    print(f"Copying to: {new_file_path}")
+                    
+                    # Ensure the playlist covers directory exists
+                    os.makedirs(playlist_covers_dir, exist_ok=True)
+                    
+                    # Copy the file
+                    shutil.copy2(original_path, new_file_path)
+                    
+                    # Set the playlist cover_image field to the new file
+                    relative_path = f"images/playlist_covers/{new_filename}"
+                    playlist.cover_image.name = relative_path
                     playlist.save()
-                    print(f"Auto-set playlist cover from first song: {song.title}")
+                    
+                    print(f"Successfully copied and set playlist cover: {relative_path}")
+                    
                 except Exception as e:
-                    print(f"Failed to auto-set playlist cover: {str(e)}")
+                    print(f"Failed to copy song cover to playlist: {str(e)}")
+                    import traceback
+                    print(f"Traceback: {traceback.format_exc()}")
                     # Don't fail the entire operation if cover setting fails
             
-            return Response({"message": "Song added to playlist"}, status=200)
+            # Return updated playlist data
+            from library.serializers import PlaylistDetailSerializer
+            serializer = PlaylistDetailSerializer(playlist)
+            return Response({
+                "message": "Song added to playlist",
+                "playlist": serializer.data
+            }, status=200)
         except Playlist.DoesNotExist:
             return Response({"error": "Playlist not found"}, status=404)
         except Song.DoesNotExist:
