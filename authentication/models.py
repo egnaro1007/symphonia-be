@@ -19,13 +19,31 @@ def user_profile_picture_path(instance, filename):
 
 # UserProfile model to store additional user information like profile picture
 class UserProfile(models.Model):
+    GENDER_CHOICES = [
+        ('M', 'Nam'),
+        ('F', 'Nữ'),
+        ('O', 'Khác'),
+    ]
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     profile_picture = models.ImageField(upload_to=user_profile_picture_path, blank=True, null=True)
+    first_name = models.CharField(max_length=150, blank=True)
+    last_name = models.CharField(max_length=150, blank=True)
+    email = models.EmailField(blank=True, unique=True, null=True)
+    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True)
+    birth_date = models.DateField(default='2000-01-01')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def save(self, *args, **kwargs):
+        # Convert empty email string to None to ensure unique constraint works properly
+        if self.email == '':
+            self.email = None
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.user.username}'s Profile"
+        email_info = f" ({self.email})" if self.email else ""
+        return f"{self.user.username}'s Profile{email_info}"
 
     @property
     def profile_picture_url(self):
@@ -39,8 +57,16 @@ def get_profile_picture_url(self):
     try:
         return self.profile.profile_picture_url
     except UserProfile.DoesNotExist:
-        # Create a profile if it doesn't exist
-        UserProfile.objects.create(user=self)
+        # Create a profile if it doesn't exist with default values
+        UserProfile.objects.create(
+            user=self,
+            first_name='Jane',
+            last_name='Doe',
+            gender='O',  # 'O' for Khác
+            birth_date='2000-01-01',
+            email=None,  # để trống
+            profile_picture=None  # để trống (avatar)
+        )
         return None
 
 User.add_to_class('get_profile_picture_url', get_profile_picture_url)
@@ -190,11 +216,27 @@ class Friendship(models.Model):
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
-        UserProfile.objects.create(user=instance)
+        UserProfile.objects.create(
+            user=instance,
+            first_name='Jane',
+            last_name='Doe',
+            gender='O',  # 'O' for Khác
+            birth_date='2000-01-01',
+            email=None,  # để trống
+            profile_picture=None  # để trống (avatar)
+        )
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
     try:
         instance.profile.save()
     except UserProfile.DoesNotExist:
-        UserProfile.objects.create(user=instance)
+        UserProfile.objects.create(
+            user=instance,
+            first_name='Jane',
+            last_name='Doe',
+            gender='O',  # 'O' for Khác
+            birth_date='2000-01-01',
+            email=None,  # để trống
+            profile_picture=None  # để trống (avatar)
+        )

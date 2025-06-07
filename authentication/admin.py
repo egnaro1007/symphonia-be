@@ -4,9 +4,9 @@ from .models import UserProfile, FriendRequest, Friendship
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'created_at', 'updated_at')
-    list_filter = ('created_at', 'updated_at')
-    search_fields = ('user__username', 'user__email')
+    list_display = ('user', 'first_name', 'last_name', 'email', 'gender', 'birth_date', 'created_at', 'updated_at')
+    list_filter = ('created_at', 'updated_at', 'gender')
+    search_fields = ('user__username', 'first_name', 'last_name', 'email')
 
 @admin.register(FriendRequest)
 class FriendRequestAdmin(admin.ModelAdmin):

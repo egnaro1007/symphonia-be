@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from .models import Friendship, FriendRequest, UserProfile
-from .serializers import RegisterUserSerializer, UserProfilePictureSerializer
+from .serializers import RegisterUserSerializer, UserProfilePictureSerializer, UserProfileSerializer
 
 class RegisterUserAPIView(APIView):
     def post(self, request):
@@ -31,8 +31,18 @@ class UpdateProfilePictureAPIView(APIView):
         if not user.is_authenticated:
             return Response({"error": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
         
-        # Get or create UserProfile for the user
-        profile, created = UserProfile.objects.get_or_create(user=user)
+        # Get or create UserProfile for the user with default values
+        profile, created = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'first_name': 'Jane',
+                'last_name': 'Doe',
+                'gender': 'O',
+                'birth_date': '2000-01-01',
+                'email': None,
+                'profile_picture': None
+            }
+        )
         
         # Delete old profile picture if it exists
         if profile.profile_picture:
@@ -109,17 +119,43 @@ class GetUserInfoAPIView(APIView):
         
 
         if not requested_user_id:
-            # Get profile picture URL for current user
+            # Get profile info for current user
             profile_picture_url = user.get_profile_picture_url()
-            user_data = {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "profile_picture_url": profile_picture_url,
-                "relationships_status": "none"
-            }
+            try:
+                profile = user.profile
+                user_data = {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": profile.email,
+                    "first_name": profile.first_name,
+                    "last_name": profile.last_name,
+                    "gender": profile.gender,
+                    "birth_date": profile.birth_date,
+                    "profile_picture_url": profile_picture_url,
+                    "relationships_status": "none"
+                }
+            except UserProfile.DoesNotExist:
+                # Create profile if it doesn't exist with default values
+                profile = UserProfile.objects.create(
+                    user=user,
+                    first_name='Jane',
+                    last_name='Doe',
+                    gender='O',
+                    birth_date='2000-01-01',
+                    email=None,
+                    profile_picture=None
+                )
+                user_data = {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": profile.email,
+                    "first_name": profile.first_name,
+                    "last_name": profile.last_name,
+                    "gender": profile.gender,
+                    "birth_date": profile.birth_date,
+                    "profile_picture_url": profile_picture_url,
+                    "relationships_status": "none"
+                }
         else:
             try:
                 requested_user = User.objects.get(id=requested_user_id)
@@ -127,19 +163,73 @@ class GetUserInfoAPIView(APIView):
             except User.DoesNotExist:
                 return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-            # Get profile picture URL for requested user
+            # Get profile info for requested user
             profile_picture_url = requested_user.get_profile_picture_url()
-            user_data = {
-                "id": requested_user.id,
-                "username": requested_user.username,
-                "email": requested_user.email,
-                "first_name": requested_user.first_name,
-                "last_name": requested_user.last_name,
-                "profile_picture_url": profile_picture_url,
-                "relationships_status": user.get_friend_status(requested_user)
-            }
+            try:
+                profile = requested_user.profile
+                user_data = {
+                    "id": requested_user.id,
+                    "username": requested_user.username,
+                    "email": profile.email,
+                    "first_name": profile.first_name,
+                    "last_name": profile.last_name,
+                    "gender": profile.gender,
+                    "birth_date": profile.birth_date,
+                    "profile_picture_url": profile_picture_url,
+                    "relationships_status": user.get_friend_status(requested_user)
+                }
+            except UserProfile.DoesNotExist:
+                # Create profile if it doesn't exist with default values
+                profile = UserProfile.objects.create(
+                    user=requested_user,
+                    first_name='Jane',
+                    last_name='Doe',
+                    gender='O',
+                    birth_date='2000-01-01',
+                    email=None,
+                    profile_picture=None
+                )
+                user_data = {
+                    "id": requested_user.id,
+                    "username": requested_user.username,
+                    "email": profile.email,
+                    "first_name": profile.first_name,
+                    "last_name": profile.last_name,
+                    "gender": profile.gender,
+                    "birth_date": profile.birth_date,
+                    "profile_picture_url": profile_picture_url,
+                    "relationships_status": user.get_friend_status(requested_user)
+                }
         
         return Response(user_data, status=status.HTTP_200_OK)    
+
+class UpdateUserProfileAPIView(APIView):
+    def put(self, request):
+        user = request.user
+        if not user.is_authenticated:
+            return Response({"error": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Get or create UserProfile for the user with default values
+        profile, created = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'first_name': 'Jane',
+                'last_name': 'Doe',
+                'gender': 'O',
+                'birth_date': '2000-01-01',
+                'email': None,
+                'profile_picture': None
+            }
+        )
+        
+        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Profile updated successfully",
+                "profile": serializer.data
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class GetUserIDFromUsernameAPIView(APIView):
     def post(self, request):
