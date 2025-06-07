@@ -305,6 +305,39 @@ class AddSongToPlaylistView(APIView):
         except Song.DoesNotExist:
             return Response({"error": "Song not found"}, status=404)
 
+class RemoveSongFromPlaylistView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, *args, **kwargs):
+        playlist_id = request.data.get('playlist_id')
+        song_id = request.data.get('song_id')
+
+        if not playlist_id or not song_id:
+            return Response({"error": "playlist_id and song_id fields are required"}, status=400)
+
+        try:
+            playlist = Playlist.objects.get(id=playlist_id, owner=request.user)
+            song = Song.objects.get(id=song_id)
+            
+            # Check if song is in the playlist
+            if song not in playlist.songs.all():
+                return Response({"error": "Song not found in playlist"}, status=404)
+            
+            # Remove song from playlist
+            playlist.songs.remove(song)
+            
+            # Return updated playlist data
+            from library.serializers import PlaylistDetailSerializer
+            serializer = PlaylistDetailSerializer(playlist)
+            return Response({
+                "message": "Song removed from playlist",
+                "playlist": serializer.data
+            }, status=200)
+        except Playlist.DoesNotExist:
+            return Response({"error": "Playlist not found"}, status=404)
+        except Song.DoesNotExist:
+            return Response({"error": "Song not found"}, status=404)
+
 class UpdateListeningHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
