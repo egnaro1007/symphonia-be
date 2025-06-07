@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
 from authentication.views import RegisterUserAPIView, SearchUserAPIView, GetUserInfoAPIView, GetUserIDFromUsernameAPIView
-from authentication.views import FriendRequestAPIView, ResponseFriendRequestAPIView, UnfriendAPIView, UpdateProfilePictureAPIView, UpdateUserProfileAPIView
+from authentication.views import FriendRequestAPIView, ResponseFriendRequestAPIView, UnfriendAPIView, UpdateProfilePictureAPIView, UpdateUserProfileAPIView, ChangePasswordAPIView
 
 
 urlpatterns = [
@@ -21,4 +21,5 @@ urlpatterns = [
     path('unfriend/', UnfriendAPIView.as_view(), name='unfriend'),
     path('update_profile_picture/', UpdateProfilePictureAPIView.as_view(), name='update_profile_picture'),
     path('update_profile/', UpdateUserProfileAPIView.as_view(), name='update_user_profile'),
+    path('change-password/', ChangePasswordAPIView.as_view(), name='change_password'),
 ]
