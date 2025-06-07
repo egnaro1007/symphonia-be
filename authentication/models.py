@@ -1,6 +1,49 @@
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+import os
+from uuid import uuid4
+
+def user_profile_picture_path(instance, filename):
+    """
+    Generate file path for user profile picture.
+    File will be saved to MEDIA_ROOT/profile_pictures/{user_id}.{extension}
+    """
+    # Get file extension
+    ext = filename.split('.')[-1]
+    # Create filename using user ID
+    filename = f"{instance.user.id}.{ext}"
+    return os.path.join('profile_pictures', filename)
+
+# UserProfile model to store additional user information like profile picture
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    profile_picture = models.ImageField(upload_to=user_profile_picture_path, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s Profile"
+
+    @property
+    def profile_picture_url(self):
+        if self.profile_picture:
+            return self.profile_picture.url
+        # Return None if no profile picture is set - let frontend handle default
+        return None
+
+# Add method to User model to get profile picture
+def get_profile_picture_url(self):
+    try:
+        return self.profile.profile_picture_url
+    except UserProfile.DoesNotExist:
+        # Create a profile if it doesn't exist
+        UserProfile.objects.create(user=self)
+        return None
+
+User.add_to_class('get_profile_picture_url', get_profile_picture_url)
 
 User.add_to_class(
     'get_friends',
@@ -142,3 +185,16 @@ class Friendship(models.Model):
             friendship.delete()
             return True
         return False
+
+# Signal to automatically create UserProfile when User is created
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        UserProfile.objects.create(user=instance)
+
+@receiver(post_save, sender=User)
+def save_user_profile(sender, instance, **kwargs):
+    try:
+        instance.profile.save()
+    except UserProfile.DoesNotExist:
+        UserProfile.objects.create(user=instance)

@@ -2,9 +2,10 @@ from django.contrib.auth.models import User
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
 
-from .models import Friendship, FriendRequest
-from .serializers import RegisterUserSerializer
+from .models import Friendship, FriendRequest, UserProfile
+from .serializers import RegisterUserSerializer, UserProfilePictureSerializer
 
 class RegisterUserAPIView(APIView):
     def post(self, request):
@@ -22,6 +23,53 @@ class RegisterUserAPIView(APIView):
         user.delete()
         return Response({"message": "Your account has been deleted successfully."}, status=status.HTTP_200_OK)
 
+class UpdateProfilePictureAPIView(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+    
+    def post(self, request):
+        user = request.user
+        if not user.is_authenticated:
+            return Response({"error": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Get or create UserProfile for the user
+        profile, created = UserProfile.objects.get_or_create(user=user)
+        
+        # Delete old profile picture if it exists
+        if profile.profile_picture:
+            old_picture = profile.profile_picture
+            # Delete the physical file
+            if old_picture.name:
+                old_picture.delete(save=False)
+        
+        serializer = UserProfilePictureSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Profile picture updated successfully",
+                "profile_picture_url": profile.profile_picture_url
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request):
+        user = request.user
+        if not user.is_authenticated:
+            return Response({"error": "Authentication credentials were not provided."}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        try:
+            profile = user.profile
+            if profile.profile_picture:
+                profile.profile_picture.delete()
+                profile.profile_picture = None
+                profile.save()
+                return Response({
+                    "message": "Profile picture deleted successfully",
+                    "profile_picture_url": profile.profile_picture_url  # This will return default avatar URL
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "No profile picture to delete"}, status=status.HTTP_400_BAD_REQUEST)
+        except UserProfile.DoesNotExist:
+            return Response({"error": "User profile not found"}, status=status.HTTP_404_NOT_FOUND)
+
 class SearchUserAPIView(APIView):
     def get(self, request):
         user = request.user
@@ -38,14 +86,16 @@ class SearchUserAPIView(APIView):
             user_data = [{
                 "id": result.id, 
                 "username": result.username, 
-                "relationships_status": user.get_friend_status(result)
+                "relationships_status": user.get_friend_status(result),
+                "profile_picture_url": result.get_profile_picture_url()
             } for result in results]
         else:
             results = results[:max_results]  # Also limit results for unauthenticated users
             user_data = [{
                 "id": result.id, 
                 "username": result.username,
-                "relationships_status": "none"
+                "relationships_status": "none",
+                "profile_picture_url": result.get_profile_picture_url()
             } for result in results]
         
         return Response(user_data, status=status.HTTP_200_OK)
@@ -59,12 +109,15 @@ class GetUserInfoAPIView(APIView):
         
 
         if not requested_user_id:
+            # Get profile picture URL for current user
+            profile_picture_url = user.get_profile_picture_url()
             user_data = {
                 "id": user.id,
                 "username": user.username,
                 "email": user.email,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
+                "profile_picture_url": profile_picture_url,
                 "relationships_status": "none"
             }
         else:
@@ -74,12 +127,15 @@ class GetUserInfoAPIView(APIView):
             except User.DoesNotExist:
                 return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
+            # Get profile picture URL for requested user
+            profile_picture_url = requested_user.get_profile_picture_url()
             user_data = {
                 "id": requested_user.id,
                 "username": requested_user.username,
                 "email": requested_user.email,
                 "first_name": requested_user.first_name,
                 "last_name": requested_user.last_name,
+                "profile_picture_url": profile_picture_url,
                 "relationships_status": user.get_friend_status(requested_user)
             }
         
@@ -134,7 +190,8 @@ class FriendRequestAPIView(APIView):
         friends = [
             {
                 "id": friend.id,
-                "username": friend.username
+                "username": friend.username,
+                "profile_picture_url": friend.get_profile_picture_url()
             }
             for friend in user.get_friends()
         ]
@@ -150,7 +207,8 @@ class FriendRequestAPIView(APIView):
             {
                 "id": request.id,
                 "sender_user_id": request.sender.id,
-                "sender_username": request.sender.username
+                "sender_username": request.sender.username,
+                "profile_picture_url": request.sender.get_profile_picture_url()
             }
             for request in user.get_received_friend_requests()
         ]

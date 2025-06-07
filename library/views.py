@@ -547,3 +547,43 @@ class UploadLyricsView(APIView):
             {"message": "Lyrics removed successfully"}, 
             status=status.HTTP_200_OK
         )
+
+class UserPlaylistsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id, *args, **kwargs):
+        try:
+            # Get the target user
+            target_user = User.objects.get(id=user_id)
+            
+            # Get playlists that are accessible to the requesting user
+            playlists = Playlist.objects.filter(owner=target_user)
+            
+            # Filter based on share permissions
+            accessible_playlists = []
+            for playlist in playlists:
+                if playlist.is_accessible_by(request.user):
+                    accessible_playlists.append(playlist)
+            
+            # Serialize the playlists with owner info
+            playlist_data = []
+            for playlist in accessible_playlists:
+                playlist_data.append({
+                    'id': playlist.id,
+                    'name': playlist.name,
+                    'description': playlist.description,
+                    'share_permission': playlist.share_permission,
+                    'creator': playlist.owner.username,
+                    'owner': playlist.owner.id,
+                    'owner_avatar_url': playlist.owner.get_profile_picture_url(),
+                    'picture': playlist.cover_image.url if playlist.cover_image else None,
+                    'created_at': playlist.created_at,
+                    'updated_at': playlist.updated_at,
+                })
+            
+            return Response(playlist_data, status=status.HTTP_200_OK)
+            
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

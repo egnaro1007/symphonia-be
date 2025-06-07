@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .views import SongViewSet, ArtistViewSet, AlbumViewSet, PlaylistViewSet
-from .views import SearchView, UpdateListeningHistoryView, ListeningHistoryView, AddSongToPlaylistView, RemoveSongFromPlaylistView, LikedSongsView, UploadLyricsView
+from .views import SearchView, UpdateListeningHistoryView, ListeningHistoryView, AddSongToPlaylistView, RemoveSongFromPlaylistView, LikedSongsView, UploadLyricsView, UserPlaylistsView
 
 router = DefaultRouter()
 router.register(r'songs', SongViewSet, basename='song')
@@ -19,4 +19,5 @@ urlpatterns = router.urls + [
     path('like/', LikedSongsView.as_view(), name='like_song'),
     path('like/<int:song_id>/', LikedSongsView.as_view(), name='like_song'),
     path('songs/<int:song_id>/lyrics/', UploadLyricsView.as_view(), name='upload_lyrics'),
+    path('user-playlists/<int:user_id>/', UserPlaylistsView.as_view(), name='user_playlists'),
 ]

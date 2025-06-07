@@ -69,17 +69,21 @@ class PlaylistSerializer(serializers.ModelSerializer):
 class PlaylistDetailSerializer(serializers.ModelSerializer):
     songs = SimpleSongSerializer(many=True, read_only=True)
     owner_name = serializers.SerializerMethodField()
+    owner_avatar_url = serializers.SerializerMethodField()
     total_duration_seconds = serializers.SerializerMethodField()
     songs_count = serializers.SerializerMethodField()
     cover_image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Playlist
-        fields = ['id', 'owner', 'owner_name', 'name', 'description', 'songs', 'cover_image', 'cover_image_url', 'created_at', 'updated_at', 'share_permission', 'total_duration_seconds', 'songs_count']
+        fields = ['id', 'owner', 'owner_name', 'owner_avatar_url', 'name', 'description', 'songs', 'cover_image', 'cover_image_url', 'created_at', 'updated_at', 'share_permission', 'total_duration_seconds', 'songs_count']
         read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
 
     def get_owner_name(self, obj):
         return obj.owner.username if obj.owner else 'Unknown'
+    
+    def get_owner_avatar_url(self, obj):
+        return obj.owner.get_profile_picture_url() if obj.owner else None
     
     def get_total_duration_seconds(self, obj):
         total_seconds = 0
