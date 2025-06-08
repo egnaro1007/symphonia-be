@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet, ModelViewSet
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
+from django.db import models
 from django.contrib.auth.models import User
 import json
 from rest_framework import status
@@ -122,6 +123,16 @@ class ArtistViewSet(ReadOnlyModelViewSet):
 class AlbumViewSet(ReadOnlyModelViewSet):
     queryset = Album.objects.all()
     serializer_class = AlbumSerializer
+    
+    def list(self, request, *args, **kwargs):
+        # Get all albums and shuffle them
+        albums = list(Album.objects.all())
+        import random
+        random.shuffle(albums)
+        
+        # Serialize the shuffled albums
+        serializer = self.get_serializer(albums, many=True)
+        return Response(serializer.data)
 
 class PlaylistViewSet(ModelViewSet):
     queryset = Playlist.objects.all()
@@ -661,5 +672,113 @@ class UserPlaylistsView(APIView):
             
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PublicPlaylistsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        try:
+            # Get all public playlists from all users
+            public_playlists = Playlist.objects.filter(
+                share_permission='public'
+            ).exclude(
+                owner=request.user  # Exclude current user's playlists
+            )
+            
+            # Convert to list and shuffle randomly
+            import random
+            public_playlists_list = list(public_playlists)
+            random.shuffle(public_playlists_list)
+            
+            # Serialize the playlists with owner info
+            playlist_data = []
+            for playlist in public_playlists_list:
+                playlist_data.append({
+                    'id': playlist.id,
+                    'name': playlist.name,
+                    'description': playlist.description,
+                    'share_permission': playlist.share_permission,
+                    'creator': playlist.owner.username,
+                    'owner': playlist.owner.id,
+                    'owner_name': playlist.owner.username,
+                    'owner_avatar_url': playlist.owner.get_profile_picture_url(),
+                    'cover_image_url': playlist.cover_image.url if playlist.cover_image else None,
+                    'picture': playlist.cover_image.url if playlist.cover_image else None,
+                    'total_duration_seconds': sum(
+                        int(song.duration.total_seconds()) if song.duration else 0 
+                        for song in playlist.songs.all()
+                    ),
+                    'songs_count': playlist.songs.count(),
+                    'created_at': playlist.created_at,
+                    'updated_at': playlist.updated_at,
+                })
+            
+            return Response(playlist_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class FriendsPlaylistsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        try:
+            # Get all friends of the current user
+            current_user = request.user
+            
+            # Get friends through friendship relationship
+            from authentication.models import Friendship
+            friendships = Friendship.objects.filter(
+                models.Q(user1=current_user) | models.Q(user2=current_user)
+            )
+            
+            # Extract friend user IDs
+            friend_ids = []
+            for friendship in friendships:
+                if friendship.user1 == current_user:
+                    friend_ids.append(friendship.user2.id)
+                else:
+                    friend_ids.append(friendship.user1.id)
+            
+            # Get all friends-only playlists from friends
+            friends_playlists = Playlist.objects.filter(
+                owner__id__in=friend_ids,
+                share_permission='friends'
+            )
+            
+            # Convert to list and shuffle randomly
+            import random
+            friends_playlists_list = list(friends_playlists)
+            random.shuffle(friends_playlists_list)
+            
+            # Serialize the playlists with owner info
+            playlist_data = []
+            for playlist in friends_playlists_list:
+                playlist_data.append({
+                    'id': playlist.id,
+                    'name': playlist.name,
+                    'description': playlist.description,
+                    'share_permission': playlist.share_permission,
+                    'creator': playlist.owner.username,
+                    'owner': playlist.owner.id,
+                    'owner_name': playlist.owner.username,
+                    'owner_avatar_url': playlist.owner.get_profile_picture_url(),
+                    'cover_image_url': playlist.cover_image.url if playlist.cover_image else None,
+                    'picture': playlist.cover_image.url if playlist.cover_image else None,
+                    'total_duration_seconds': sum(
+                        int(song.duration.total_seconds()) if song.duration else 0 
+                        for song in playlist.songs.all()
+                    ),
+                    'songs_count': playlist.songs.count(),
+                    'created_at': playlist.created_at,
+                    'updated_at': playlist.updated_at,
+                })
+            
+            return Response(playlist_data, status=status.HTTP_200_OK)
+            
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
