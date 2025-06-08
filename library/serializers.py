@@ -7,6 +7,11 @@ class ArtistSerializer(serializers.ModelSerializer):
         model = Artist
         fields = ['id', 'name', 'bio', 'artist_picture']
 
+class SimpleArtistSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Artist
+        fields = ['id', 'name', 'artist_picture']
+
 class AlbumSerializer(serializers.ModelSerializer):
     artist = ArtistSerializer(many=True)
     songs = serializers.SerializerMethodField()
@@ -31,7 +36,7 @@ class SimpleAlbumSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'artist', 'release_date', 'cover_art']
 
 class SongSerializer(serializers.ModelSerializer):
-    artist = ArtistSerializer(many=True) 
+    artist = SimpleArtistSerializer(many=True) 
     album = SimpleAlbumSerializer(many=True)
     available_qualities = serializers.SerializerMethodField()
     audio_urls = serializers.SerializerMethodField()
