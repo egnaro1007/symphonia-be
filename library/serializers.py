@@ -32,20 +32,43 @@ class SimpleAlbumSerializer(serializers.ModelSerializer):
 
 class SongSerializer(serializers.ModelSerializer):
     artist = ArtistSerializer(many=True) 
-    album = SimpleAlbumSerializer(many=True) 
+    album = SimpleAlbumSerializer(many=True)
+    available_qualities = serializers.SerializerMethodField()
+    audio_urls = serializers.SerializerMethodField()
+    audio_file_sizes = serializers.SerializerMethodField()
 
     class Meta:
         model = Song
-        fields = ['id', 'title', 'artist', 'album', 'release_date', 'duration', 'cover_art', 'audio', 'lyric']
+        fields = ['id', 'title', 'artist', 'album', 'release_date', 'duration', 'cover_art', 'audio', 'audio_urls', 'available_qualities', 'audio_file_sizes', 'lyric']
+
+    def get_available_qualities(self, obj):
+        return obj.get_available_qualities()
+    
+    def get_audio_urls(self, obj):
+        return {
+            'lossless': obj.audio_lossless.url if obj.audio_lossless and obj.audio_lossless.name else None,
+            '320kbps': obj.audio_320kbps.url if obj.audio_320kbps and obj.audio_320kbps.name else None,
+            '128kbps': obj.audio_128kbps.url if obj.audio_128kbps and obj.audio_128kbps.name else None,
+            'legacy': obj.audio.url if obj.audio and obj.audio.name else None,
+        }
+    
+    def get_audio_file_sizes(self, obj):
+        return {
+            'lossless': obj.get_file_size('lossless'),
+            '320kbps': obj.get_file_size('320kbps'),
+            '128kbps': obj.get_file_size('128kbps'),
+        }
 
 class SimpleSongSerializer(serializers.ModelSerializer):
     artist = serializers.SerializerMethodField()
     cover_art = serializers.SerializerMethodField()
     duration_seconds = serializers.SerializerMethodField()
+    available_qualities = serializers.SerializerMethodField()
+    audio_urls = serializers.SerializerMethodField()
 
     class Meta:
         model = Song
-        fields = ['id', 'title', 'artist', 'cover_art', 'audio', 'lyric', 'duration_seconds']
+        fields = ['id', 'title', 'artist', 'cover_art', 'audio', 'audio_urls', 'available_qualities', 'lyric', 'duration_seconds']
 
     def get_artist(self, obj):
         return [{'id': artist.id, 'name': artist.name} for artist in obj.artist.all()]
@@ -58,6 +81,17 @@ class SimpleSongSerializer(serializers.ModelSerializer):
             return int(obj.duration.total_seconds())
         return 0
     
+    def get_available_qualities(self, obj):
+        return obj.get_available_qualities()
+    
+    def get_audio_urls(self, obj):
+        return {
+            'lossless': obj.audio_lossless.url if obj.audio_lossless and obj.audio_lossless.name else None,
+            '320kbps': obj.audio_320kbps.url if obj.audio_320kbps and obj.audio_320kbps.name else None,
+            '128kbps': obj.audio_128kbps.url if obj.audio_128kbps and obj.audio_128kbps.name else None,
+            'legacy': obj.audio.url if obj.audio and obj.audio.name else None,
+        }
+
 class PlaylistSerializer(serializers.ModelSerializer):
     songs = serializers.PrimaryKeyRelatedField(queryset=Song.objects.all(), many=True, required=False)
 

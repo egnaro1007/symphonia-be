@@ -38,6 +38,82 @@ class SearchView(APIView):
 class SongViewSet(ReadOnlyModelViewSet):
     queryset = Song.objects.all()
     serializer_class = SongSerializer
+    
+    @action(detail=True, methods=['get'])
+    def audio(self, request, pk=None):
+        """
+        Get audio URL for a specific quality
+        Usage: GET /api/songs/{id}/audio/?quality=320kbps
+        """
+        song = self.get_object()
+        quality = request.query_params.get('quality', '320kbps')
+        
+        audio_url = song.get_audio_url(quality)
+        if not audio_url:
+            return Response(
+                {
+                    'error': 'Audio not available for this quality',
+                    'available_qualities': song.get_available_qualities()
+                }, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        return Response({
+            'audio_url': audio_url,
+            'quality': quality,
+            'available_qualities': song.get_available_qualities(),
+            'file_size': song.get_file_size(quality)
+        })
+    
+    @action(detail=True, methods=['post'])
+    def upload_audio(self, request, pk=None):
+        """
+        Upload audio file for a specific quality
+        Usage: POST /api/songs/{id}/upload_audio/ with form data containing 'audio_file' and 'quality'
+        """
+        song = self.get_object()
+        
+        if 'audio_file' not in request.FILES:
+            return Response(
+                {'error': 'No audio file provided'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        audio_file = request.FILES['audio_file']
+        quality = request.data.get('quality', '320kbps')
+        
+        if quality not in ['lossless', '320kbps', '128kbps']:
+            return Response(
+                {'error': 'Invalid quality. Must be one of: lossless, 320kbps, 128kbps'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate file type
+        allowed_extensions = ['.mp3', '.flac', '.wav', '.m4a']
+        import os
+        file_extension = os.path.splitext(audio_file.name)[1].lower()
+        
+        if file_extension not in allowed_extensions:
+            return Response(
+                {'error': f'Invalid file format. Allowed formats: {", ".join(allowed_extensions)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Set the appropriate field based on quality
+        if quality == 'lossless':
+            song.audio_lossless = audio_file
+        elif quality == '320kbps':
+            song.audio_320kbps = audio_file
+        elif quality == '140kbps':
+            song.audio_140kbps = audio_file
+        
+        song.save()
+        
+        serializer = SongSerializer(song)
+        return Response({
+            'message': f'Audio uploaded successfully for {quality} quality',
+            'song': serializer.data
+        }, status=status.HTTP_200_OK)
 
 class ArtistViewSet(ReadOnlyModelViewSet):
     queryset = Artist.objects.all()
