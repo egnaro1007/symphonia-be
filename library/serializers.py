@@ -66,6 +66,7 @@ class SongSerializer(serializers.ModelSerializer):
 
 class SimpleSongSerializer(serializers.ModelSerializer):
     artist = serializers.SerializerMethodField()
+    album = serializers.SerializerMethodField()
     cover_art = serializers.SerializerMethodField()
     duration_seconds = serializers.SerializerMethodField()
     available_qualities = serializers.SerializerMethodField()
@@ -73,10 +74,13 @@ class SimpleSongSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Song
-        fields = ['id', 'title', 'artist', 'cover_art', 'audio', 'audio_urls', 'available_qualities', 'lyric', 'duration_seconds']
+        fields = ['id', 'title', 'artist', 'album', 'release_date', 'cover_art', 'audio', 'audio_urls', 'available_qualities', 'lyric', 'duration_seconds']
 
     def get_artist(self, obj):
         return [{'id': artist.id, 'name': artist.name} for artist in obj.artist.all()]
+    
+    def get_album(self, obj):
+        return [{'id': album.id, 'title': album.title, 'release_date': album.release_date} for album in obj.album.all()]
     
     def get_cover_art(self, obj):
         return obj.cover_art.url if obj.cover_art else None
